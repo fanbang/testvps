@@ -381,12 +381,31 @@ calculate_total_performance() {
     # 提取读取带宽和IOPS
     local read_bw_val=$(echo "$read_perf" | grep -o '[0-9.]*' | head -1)
     local read_bw_unit=$(echo "$read_perf" | grep -o '[MGT]*B/s' | head -1)
-    local read_iops=$(echo "$read_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()k]//g')
+    local read_iops_raw=$(echo "$read_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()]//g')
     
     # 提取写入带宽和IOPS
     local write_bw_val=$(echo "$write_perf" | grep -o '[0-9.]*' | head -1)
     local write_bw_unit=$(echo "$write_perf" | grep -o '[MGT]*B/s' | head -1)
-    local write_iops=$(echo "$write_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()k]//g')
+    local write_iops_raw=$(echo "$write_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()]//g')
+    
+    # 处理IOPS单位转换
+    local read_iops_val=$(echo "$read_iops_raw" | sed 's/k$//')
+    local read_has_k=$(echo "$read_iops_raw" | grep -c 'k$')
+    local write_iops_val=$(echo "$write_iops_raw" | sed 's/k$//')
+    local write_has_k=$(echo "$write_iops_raw" | grep -c 'k$')
+    
+    # 统一转换为实际IOPS值
+    if [ "$read_has_k" -eq 1 ]; then
+        read_iops=$(echo "scale=1; $read_iops_val * 1000" | bc 2>/dev/null || echo "0")
+    else
+        read_iops="$read_iops_val"
+    fi
+    
+    if [ "$write_has_k" -eq 1 ]; then
+        write_iops=$(echo "scale=1; $write_iops_val * 1000" | bc 2>/dev/null || echo "0")
+    else
+        write_iops="$write_iops_val"
+    fi
     
     # 转换为MB/s计算
     local read_mb=0
