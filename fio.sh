@@ -351,13 +351,19 @@ else
 fi
 
 # 输出格式化结果
-echo "Block Size | 4k (IOPS)      | 64k (IOPS) "
-echo "Read       | ${read_4k}   | ${read_64k}"
-echo "Write      | ${write_4k}   | ${write_64k}"
-echo "  ---  --- | --- ---- ---   | ---- ------"
-echo "Block Size | 512k (IOPS)    | 1m (IOPS)" 
-echo "Read       | ${read_512k}   | ${read_1m}"
-echo "Write      | ${write_512k}  | ${write_1m}"
+echo "---------------------------------------------------------------"
+echo "| Block Size |        4k (IOPS)        |       64k (IOPS)      |"
+echo "---------------------------------------------------------------"
+echo "| Read       | $(printf "%-23s" "${read_4k}") | $(printf "%-22s" "${read_64k}") |"
+echo "| Write      | $(printf "%-23s" "${write_4k}") | $(printf "%-22s" "${write_64k}") |"
+echo "---------------------------------------------------------------"
+echo ""
+echo "---------------------------------------------------------------"
+echo "| Block Size |       512k (IOPS)       |        1m (IOPS)      |"
+echo "---------------------------------------------------------------"
+echo "| Read       | $(printf "%-23s" "${read_512k}") | $(printf "%-22s" "${read_1m}") |"
+echo "| Write      | $(printf "%-23s" "${write_512k}") | $(printf "%-22s" "${write_1m}") |"
+echo "---------------------------------------------------------------"
 
 echo
 echo "测试完成！"
