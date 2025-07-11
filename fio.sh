@@ -143,9 +143,31 @@ run_simple_test() {
         --time_based \
         --runtime=${RUNTIME} 2>/dev/null)
     
-    # 解析结果
-    local bw=$(echo "$result" | grep -E "(read|write):" | grep -o "BW=[0-9.]*[MGK]iB/s" | head -1 | sed 's/BW=//' | sed 's/iB\/s/B\/s/')
-    local iops_raw=$(echo "$result" | grep -E "(read|write):" | grep -o "IOPS=[0-9.]*[k]*" | head -1 | sed 's/IOPS=//')
+    if [ "$rw" = "randrw" ]; then
+        # 混合读写模式，提取读写分别的性能
+        local read_bw=$(echo "$result" | grep "read:" | grep -o "BW=[0-9.]*[MGK]iB/s" | head -1 | sed 's/BW=//' | sed 's/iB\/s/B\/s/')
+        local read_iops_raw=$(echo "$result" | grep "read:" | grep -o "IOPS=[0-9.]*[k]*" | head -1 | sed 's/IOPS=//')
+        local write_bw=$(echo "$result" | grep "write:" | grep -o "BW=[0-9.]*[MGK]iB/s" | head -1 | sed 's/BW=//' | sed 's/iB\/s/B\/s/')
+        local write_iops_raw=$(echo "$result" | grep "write:" | grep -o "IOPS=[0-9.]*[k]*" | head -1 | sed 's/IOPS=//')
+        
+        # 格式化读取性能
+        local read_formatted=$(format_performance "$read_bw" "$read_iops_raw")
+        local write_formatted=$(format_performance "$write_bw" "$write_iops_raw")
+        
+        echo "READ:$read_formatted|WRITE:$write_formatted"
+    else
+        # 单一读写模式
+        local bw=$(echo "$result" | grep -E "(read|write):" | grep -o "BW=[0-9.]*[MGK]iB/s" | head -1 | sed 's/BW=//' | sed 's/iB\/s/B\/s/')
+        local iops_raw=$(echo "$result" | grep -E "(read|write):" | grep -o "IOPS=[0-9.]*[k]*" | head -1 | sed 's/IOPS=//')
+        
+        format_performance "$bw" "$iops_raw"
+    fi
+}
+
+# 格式化性能数据函数
+format_performance() {
+    local bw="$1"
+    local iops_raw="$2"
     
     if [ -z "$bw" ]; then
         bw="0MB/s"
@@ -164,25 +186,25 @@ run_simple_test() {
     
     if [ ! -z "$speed_value" ]; then
         if [ "$speed_unit" = "MB/s" ] && [ $(echo "$speed_value > 1024" | bc 2>/dev/null || echo "0") -eq 1 ]; then
-            local speed_gb=$(echo "scale=1; $speed_value / 1024" | bc 2>/dev/null || echo "0")
-            bw="${speed_gb}GB/s"
+            local speed_gb=$(echo "scale=2; $speed_value / 1024" | bc 2>/dev/null || echo "0")
+            bw="${speed_gb} GB/s"
         elif [ "$speed_unit" = "KB/s" ]; then
-            local speed_mb=$(echo "scale=1; $speed_value / 1024" | bc 2>/dev/null || echo "0")
+            local speed_mb=$(echo "scale=2; $speed_value / 1024" | bc 2>/dev/null || echo "0")
             if [ $(echo "$speed_mb > 1024" | bc 2>/dev/null || echo "0") -eq 1 ]; then
-                local speed_gb=$(echo "scale=1; $speed_mb / 1024" | bc 2>/dev/null || echo "0")
-                bw="${speed_gb}GB/s"
+                local speed_gb=$(echo "scale=2; $speed_mb / 1024" | bc 2>/dev/null || echo "0")
+                bw="${speed_gb} GB/s"
             else
-                bw="${speed_mb}MB/s"
+                bw="${speed_mb} MB/s"
             fi
+        else
+            bw=$(echo "$bw" | sed 's/B\/s/ MB\/s/')
         fi
     fi
     
     # 格式化IOPS显示
     if [ "$has_k_suffix" -eq 1 ]; then
-        # fio输出本身带k后缀，直接使用
         echo "$bw (${iops_value}k)"
     elif [ $(echo "$iops_value > 1000" | bc 2>/dev/null || echo "0") -eq 1 ]; then
-        # 数值大于1000，转换为k格式
         local iops_k=$(echo "scale=1; $iops_value / 1000" | bc 2>/dev/null || echo "0")
         echo "$bw (${iops_k}k)"
     else
@@ -288,7 +310,8 @@ generate_test_data() {
 }
 
 # 主程序开始
-echo "---------------------磁盘fio读写测试--感谢yabs开源----------------------"
+echo "fio Disk Speed Tests (Mixed R/W 50/50) (Partition -):"
+echo "---------------------------------"
 echo
 
 # 检查是否有bc命令用于计算
@@ -321,49 +344,120 @@ if [ "$USE_SIMULATION" = true ]; then
     total_1m="1.96 GB/s (1.9k)"
 else
     # 实际测试
-    echo "正在测试 4k 随机读写混合..."
-    read_4k=$(run_simple_test "4k" "randread")
-    echo "  4k 随机读: $read_4k"
-    write_4k=$(run_simple_test "4k" "randwrite")
-    echo "  4k 随机写: $write_4k"
+    echo "正在测试 4k 混合读写..."
+    result_4k=$(run_simple_test "4k" "randrw")
+    echo "  4k 混合读写: $result_4k"
     echo
     
-    echo "正在测试 64k 随机读写混合..."
-    read_64k=$(run_simple_test "64k" "randread")
-    echo "  64k 随机读: $read_64k"
-    write_64k=$(run_simple_test "64k" "randwrite")
-    echo "  64k 随机写: $write_64k"
+    echo "正在测试 64k 混合读写..."
+    result_64k=$(run_simple_test "64k" "randrw")
+    echo "  64k 混合读写: $result_64k"
     echo
     
-    echo "正在测试 512k 顺序读写..."
-    read_512k=$(run_simple_test "512k" "read")
-    echo "  512k 读取: $read_512k"
-    write_512k=$(run_simple_test "512k" "write")
-    echo "  512k 写入: $write_512k"
+    echo "正在测试 512k 混合读写..."
+    result_512k=$(run_simple_test "512k" "randrw")
+    echo "  512k 混合读写: $result_512k"
     echo
     
-    echo "正在测试 1m 顺序读写..."
-    read_1m=$(run_simple_test "1m" "read")
-    echo "  1m 读取: $read_1m"
-    write_1m=$(run_simple_test "1m" "write")
-    echo "  1m 写入: $write_1m"
+    echo "正在测试 1m 混合读写..."
+    result_1m=$(run_simple_test "1m" "randrw")
+    echo "  1m 混合读写: $result_1m"
     echo
 fi
 
 # 输出格式化结果
-echo "---------------------------------------------------------------"
-echo "| Block Size |        4k (IOPS)        |       64k (IOPS)      |"
-echo "---------------------------------------------------------------"
-echo "| Read       | $(printf "%-23s" "${read_4k}") | $(printf "%-22s" "${read_64k}") |"
-echo "| Write      | $(printf "%-23s" "${write_4k}") | $(printf "%-22s" "${write_64k}") |"
-echo "---------------------------------------------------------------"
-echo ""
-echo "---------------------------------------------------------------"
-echo "| Block Size |       512k (IOPS)       |        1m (IOPS)      |"
-echo "---------------------------------------------------------------"
-echo "| Read       | $(printf "%-23s" "${read_512k}") | $(printf "%-22s" "${read_1m}") |"
-echo "| Write      | $(printf "%-23s" "${write_512k}") | $(printf "%-22s" "${write_1m}") |"
-echo "---------------------------------------------------------------"
+parse_mixed_result() {
+    local result="$1"
+    local read_part=$(echo "$result" | cut -d'|' -f1 | sed 's/READ://')
+    local write_part=$(echo "$result" | cut -d'|' -f2 | sed 's/WRITE://')
+    echo "$read_part|$write_part"
+}
+
+# 计算总计性能
+calculate_total_performance() {
+    local read_perf="$1"
+    local write_perf="$2"
+    
+    # 提取读取带宽和IOPS
+    local read_bw_val=$(echo "$read_perf" | grep -o '[0-9.]*' | head -1)
+    local read_bw_unit=$(echo "$read_perf" | grep -o '[MGT]*B/s' | head -1)
+    local read_iops=$(echo "$read_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()k]//g')
+    
+    # 提取写入带宽和IOPS
+    local write_bw_val=$(echo "$write_perf" | grep -o '[0-9.]*' | head -1)
+    local write_bw_unit=$(echo "$write_perf" | grep -o '[MGT]*B/s' | head -1)
+    local write_iops=$(echo "$write_perf" | grep -o '([0-9.]*[k]*' | sed 's/[()k]//g')
+    
+    # 转换为MB/s计算
+    local read_mb=0
+    local write_mb=0
+    
+    if [ "$read_bw_unit" = "GB/s" ]; then
+        read_mb=$(echo "scale=2; $read_bw_val * 1024" | bc 2>/dev/null || echo "0")
+    else
+        read_mb="$read_bw_val"
+    fi
+    
+    if [ "$write_bw_unit" = "GB/s" ]; then
+        write_mb=$(echo "scale=2; $write_bw_val * 1024" | bc 2>/dev/null || echo "0")
+    else
+        write_mb="$write_bw_val"
+    fi
+    
+    local total_mb=$(echo "scale=2; $read_mb + $write_mb" | bc 2>/dev/null || echo "0")
+    local total_iops=$(echo "scale=1; $read_iops + $write_iops" | bc 2>/dev/null || echo "0")
+    
+    # 格式化输出
+    if [ $(echo "$total_mb > 1024" | bc 2>/dev/null || echo "0") -eq 1 ]; then
+        local total_gb=$(echo "scale=2; $total_mb / 1024" | bc 2>/dev/null || echo "0")
+        if [ $(echo "$total_iops > 1000" | bc 2>/dev/null || echo "0") -eq 1 ]; then
+            local iops_k=$(echo "scale=1; $total_iops / 1000" | bc 2>/dev/null || echo "0")
+            echo "${total_gb} GB/s (${iops_k}k)"
+        else
+            echo "${total_gb} GB/s (${total_iops})"
+        fi
+    else
+        if [ $(echo "$total_iops > 1000" | bc 2>/dev/null || echo "0") -eq 1 ]; then
+            local iops_k=$(echo "scale=1; $total_iops / 1000" | bc 2>/dev/null || echo "0")
+            echo "${total_mb} MB/s (${iops_k}k)"
+        else
+            echo "${total_mb} MB/s (${total_iops})"
+        fi
+    fi
+}
+
+# 解析混合结果并输出yabs格式
+result_4k_parsed=$(parse_mixed_result "$result_4k")
+read_4k=$(echo "$result_4k_parsed" | cut -d'|' -f1)
+write_4k=$(echo "$result_4k_parsed" | cut -d'|' -f2)
+total_4k=$(calculate_total_performance "$read_4k" "$write_4k")
+
+result_64k_parsed=$(parse_mixed_result "$result_64k")
+read_64k=$(echo "$result_64k_parsed" | cut -d'|' -f1)
+write_64k=$(echo "$result_64k_parsed" | cut -d'|' -f2)
+total_64k=$(calculate_total_performance "$read_64k" "$write_64k")
+
+result_512k_parsed=$(parse_mixed_result "$result_512k")
+read_512k=$(echo "$result_512k_parsed" | cut -d'|' -f1)
+write_512k=$(echo "$result_512k_parsed" | cut -d'|' -f2)
+total_512k=$(calculate_total_performance "$read_512k" "$write_512k")
+
+result_1m_parsed=$(parse_mixed_result "$result_1m")
+read_1m=$(echo "$result_1m_parsed" | cut -d'|' -f1)
+write_1m=$(echo "$result_1m_parsed" | cut -d'|' -f2)
+total_1m=$(calculate_total_performance "$read_1m" "$write_1m")
+
+echo "Block Size | 4k            (IOPS) | 64k           (IOPS)"
+echo "  ------   | ---            ----  | ----           ---- "
+echo "Read       | $(printf "%-20s" "$read_4k") | $(printf "%-20s" "$read_64k")"
+echo "Write      | $(printf "%-20s" "$write_4k") | $(printf "%-20s" "$write_64k")"
+echo "Total      | $(printf "%-20s" "$total_4k") | $(printf "%-20s" "$total_64k")"
+echo "           |                      |                     "
+echo "Block Size | 512k          (IOPS) | 1m            (IOPS)"
+echo "  ------   | ---            ----  | ----           ---- "
+echo "Read       | $(printf "%-20s" "$read_512k") | $(printf "%-20s" "$read_1m")"
+echo "Write      | $(printf "%-20s" "$write_512k") | $(printf "%-20s" "$write_1m")"
+echo "Total      | $(printf "%-20s" "$total_512k") | $(printf "%-20s" "$total_1m")"
 
 echo
 echo "测试完成！"
