@@ -1,8 +1,8 @@
 #!/bin/bash
 # VPS 性能快速检测脚本 v0.1
-# by tj 机组(teijiang,远古巨瘦,钻舰队长,鸡贼王，石巨人,牛头人)出品
+# by tj 机组(teijiang,远古巨瘦,钻舰队长,鸡贼王，石巨人,牛头人)带领claude、dp3出品
 
-echo -e "\033[1;34m===== WordPress VPS 性能快速检测 v0.1 =====\033[0m"
+echo -e "\033[1;34m===== 站长 VPS 性能快速检测 v0.1 =====\033[0m"
 echo "专注检测：IO性能、CPU稳定性、内存带宽、网络延迟、超售程度"
 echo "预计耗时：60秒"
  
@@ -144,7 +144,7 @@ estimate_gb5_from_benchmarks() {
     echo "$final_gb5"
 
 } 
-# ==================== 改进的虚拟化检测 ====================
+# ==================== 虚拟化检测 ====================
 detect_virtualization() {
     echo -e "\n\033[1;35m[系统信息] 虚拟化技术检测\033[0m"
     
@@ -193,16 +193,16 @@ detect_virtualization() {
     echo "虚拟化技术: $virt_type"
 }
 
-# ==================== 1. 修复的磁盘IO性能测试 ====================
+# ==================== 1. 磁盘IO性能测试 ====================
 test_disk_performance() {
-    echo -e "\n\033[1;34m[磁盘测试] WordPress IO模式测试\033[0m"
+    echo -e "\n\033[1;34m[磁盘测试] 建站IO密集型模式测试\033[0m"
     local test_file="/tmp/wp_io_test.bin"
     local result_file="/tmp/fio_result.json"
     
     # 清理可能的旧文件
     rm -f "$test_file" "$result_file" 2>/dev/null
     
-    # WordPress典型IO模式：4K随机读写 + 64K顺序写
+    # 建站典型IO密集型模式：4K随机读写 + 64K顺序写
     echo "测试随机4K读取（数据库查询模式）..."
     fio --name=wp_db_read --filename="$test_file" --rw=randread --bs=4k \
         --size=200M --runtime=8 --direct=1 --numjobs=4 --group_reporting \
@@ -236,7 +236,6 @@ test_disk_performance() {
     
     # 计算写入带宽（MB/s）
     local write_mbps=$((write_bw / 1024))
-    
     # 综合IO评分（模拟GB5存储分数）
     DISK_IOPS=$((read_iops + write_bw / 100))
     
@@ -244,6 +243,8 @@ test_disk_performance() {
     read_iops_formatted=$(format_number "$read_iops")
     write_mbps_formatted=$(format_number "$write_mbps")
     
+    # 使用字符串存储综合评分
+    DISK_IOPS_STR=$read_iops
     echo "4K 随机读 IOPS: ${read_iops_formatted}"
     echo "64K 写入带宽: ${write_mbps_formatted} MB/s (${write_bw} KB/s)"
     echo "综合 IO 评分: $(format_number "$DISK_IOPS")"
@@ -303,7 +304,7 @@ test_cpu_multicore_effici1ency() {
     
 }
 
-# ==================== 2. 修复的CPU性能测试 ====================
+# ==================== 2. CPU性能测试 ====================
 test_cpu_performance() {
     echo -e "\n\033[1;34m[CPU测试] 单核/多核计算能力\033[0m"
     
@@ -350,11 +351,20 @@ test_cpu_performance() {
     echo "测试多核"
     test_cpu_multicore_efficiency 
     echo "扩展多核系数：$actual_efficiency"
-    CPU_MULTI_SCORE=$(bc <<< "scale=0; $cpu_single * $actual_efficiency / $cores * 0.92 / 1")
+    # 计算多核分数
+    if (( $(echo "$actual_efficiency / $cores < 0.85" | bc -l) )); then
+        # 扩展效率较低时使用方案a
+        CPU_MULTI_SCORE=$(echo "scale=0; $CPU_SINGLE_SCORE * $actual_efficiency *$actual_efficiency / $cores * 0.92 / 1" | bc)
+        echo "检测到扩展效率较低，使用核心数优化算法"
+    else
+        # 扩展效率较高时使用方案b
+        CPU_MULTI_SCORE=$(echo "scale=0; $cpu_single * $actual_efficiency * 0.92 / 1" | bc)
+        echo "检测到良好扩展效率，使用效率优先算法"
+    fi 
     echo "多核评分: $(format_number "$CPU_MULTI_SCORE") (预估GB5)" 
 }
 
-# ==================== 3. 修复的内存带宽测试 ====================
+# ==================== 3. 内存带宽测试 ====================
 test_memory_bandwidth() {
     echo -e "\n\033[1;34m[内存测试] 内存带宽检测\033[0m"
     
@@ -403,7 +413,7 @@ test_memory_bandwidth() {
     fi
 }
 
-# ==================== 4. 修复的中断风暴检测 ====================
+# ==================== 4. 中断风暴检测 ====================
 test_interrupt_stability() {
     echo -e "\n\033[1;34m[稳定性测试] 中断和系统负载检测\033[0m"
     
@@ -609,13 +619,13 @@ assess_overselling() {
     
     # 3. IO超售检测
     # 数据库查询性能评估 (4K随机读)
-    if [[ $read_iops_formatted -gt 10000 ]]; then
+    if [[ $DISK_IOPS_STR -gt 10000 ]]; then
         echo "数据库查询性能: 优秀 ($(format_number $read_iops_formatted) IOPS) - 无超售迹象"
         io_score=3
-    elif [[ $read_iops -gt 3000 ]]; then
+    elif [[ $DISK_IOPS_STR -gt 3000 ]]; then
         echo "数据库查询性能: 良好 ($(format_number $read_iops_formatted) IOPS) - 轻度超售可能"
         io_score=2
-    elif [[ $read_iops -gt 1000 ]]; then
+    elif [[ $DISK_IOPS_STR -gt 1000 ]]; then
         echo "数据库查询性能: 一般 ($(format_number $read_iops_formatted) IOPS) - 可能超售"
         io_score=1
     else
@@ -668,7 +678,7 @@ main() {
     test_cpu_performance
     test_memory_bandwidth
     test_interrupt_stability
-    test_network_latency
+    #test_network_latency
     assess_overselling
     
     echo -e "\n\033[1;32m检测完成！\033[0m"
