@@ -1,6 +1,6 @@
 #!/bin/bash
-# WordPress VPS 性能快速检测脚本 v0.1
-# 修复虚拟化检测、磁盘IOPS为0、CPU算术错误等问题
+# VPS 性能快速检测脚本 v0.1
+# 由teijiang团队(tj,远古巨瘦,钻舰队长,鸡贼王，石巨人,牛头人)出品
 
 echo -e "\033[1;34m===== WordPress VPS 性能快速检测 v0.1 =====\033[0m"
 echo "专注检测：IO性能、CPU稳定性、内存带宽、网络延迟、超售程度"
@@ -286,20 +286,20 @@ test_cpu_multicore_effici1ency() {
     
     # 1. 单核性能测试
     local single_start=$(date +%s%N)
-    local single_perf=$(openssl speed -multi 1 rsa2048 2>/dev/null | grep 'rsa 2048' | awk '{print $5}')
+    local single_perf=$(openssl speed -multi 1 rsa2048 2>/dev/null | grep 'rsa 2048') # | awk '{print $5}'
     local single_end=$(date +%s%N)
     local single_time_ms=$(( (single_end - single_start) / 1000000 ))
     
     # 2. 多核压力测试
     local multi_start=$(date +%s%N)
-    local multi_perf=$(openssl speed -multi $cores rsa2048 2>/dev/null | grep 'rsa 2048' | awk '{print $5}')
+    local multi_perf=$(openssl speed -multi $cores rsa2048 2>/dev/null | grep 'rsa 2048' )#| awk '{print $5}'
     local multi_end=$(date +%s%N)
     local multi_time_ms=$(( (multi_end - multi_start) / 1000000 ))
     
     # 3. 计算实际扩展效率
     local theoretical_time=$(( $single_perf * cores ))
     actual_efficiency=$((theoretical_time / multi_perf))
-    echo "$actual_efficiency"
+    #echo "$actual_efficiency"
     
 }
 
@@ -350,7 +350,7 @@ test_cpu_performance() {
     echo "测试多核"
     test_cpu_multicore_efficiency 
     echo "扩展多核系数：$actual_efficiency"
-    CPU_MULTI_SCORE=$(bc <<< "scale=0; $cpu_single * $actual_efficiency * 0.92 / 1")
+    CPU_MULTI_SCORE=$(bc <<< "scale=0; $cpu_single * $actual_efficiency / $cores * 0.92 / 1")
     echo "多核评分: $(format_number "$CPU_MULTI_SCORE") (预估GB5)" 
 }
 
