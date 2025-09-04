@@ -587,33 +587,7 @@ assess_overselling() {
     else
         echo "内存带宽: 较差 (${mem_bandwidth_gbs} GB/s) - 可能超售"
         mem_bandwidth_score=0
-    fi
-    
-    # 内存使用评估
-    local mem_usage_score=0
-    if (( $(echo "$mem_used > 90" | bc -l) )); then
-        echo "内存使用率: 过高 ($mem_used%) - 超售风险高"
-        mem_usage_score=0
-    elif (( $(echo "$mem_used > 70" | bc -l) )); then
-        echo "内存使用率: 偏高 ($mem_used%) - 可能超售"
-        mem_usage_score=1
-    else
-        echo "内存使用率: 正常 ($mem_used%) - 无超售迹象"
-        mem_usage_score=2
-    fi
-    
-    # Swap使用评估
-    local swap_score=0
-    if (( $(echo "$swap_used > 10" | bc -l) )); then
-        echo "Swap使用率: 过高 ($swap_used%) - 内存不足或超售"
-        swap_score=0
-    elif (( $(echo "$swap_used > 0" | bc -l) )); then
-        echo "Swap使用率: 存在 ($swap_used%) - 需关注"
-        swap_score=1
-    else
-        echo "Swap使用率: 未使用 - 良好"
-        swap_score=2
-    fi
+    fi  
     
     memory_score=$(( mem_bandwidth_score + mem_usage_score + swap_score ))
     
@@ -648,17 +622,17 @@ assess_overselling() {
     total_score=$((cpu_score + memory_score + io_score))
     local oversell_level=""
     
-    if [[ $total_score -ge 10 ]]; then
+    if [[ $total_score -ge 8 ]]; then
         oversell_level="无超售迹象"
-    elif [[ $total_score -ge 7 ]]; then
+    elif [[ $total_score -ge 6 ]]; then
         oversell_level="轻度超售可能"
-    elif [[ $total_score -ge 4 ]]; then
+    elif [[ $total_score -ge 3 ]]; then
         oversell_level="中度超售"
     else
         oversell_level="严重超售"
     fi
     
-    echo -e "\n\033[1;35m超售综合评估: ${total_score}/12 - ${oversell_level}\033[0m"
+    echo -e "\n\033[1;35m超售综合评估: ${total_score}/9 - ${oversell_level}\033[0m"
 }
 testc() {
      
