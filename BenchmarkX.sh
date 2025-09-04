@@ -621,8 +621,9 @@ assess_overselling() {
     # 综合评分
     total_score=$((cpu_score + memory_score + io_score))
     local oversell_level=""
-    
-    if [[ $total_score -ge 8 ]]; then
+    if [[ $total_score -ge 9 ]]; then
+        oversell_level="发现性能怪兽 牛头人"
+    elif [[ $total_score -ge 8 ]]; then
         oversell_level="无超售迹象"
     elif [[ $total_score -ge 6 ]]; then
         oversell_level="轻度超售可能"
