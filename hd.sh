@@ -629,7 +629,7 @@ assess_overselling() {
     elif [[ $total_score -ge 3 ]]; then
         oversell_level="中度超售"
     else
-        oversell_level="严重超售"
+        oversell_level="发现远古巨瘦 您已严重超售"
     fi
     
     echo -e "\n\033[1;35m超售综合评估: ${total_score}/9 - ${oversell_level}\033[0m"
