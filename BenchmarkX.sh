@@ -27,6 +27,7 @@ install_tools() {
     command -v sysbench &>/dev/null || tools_needed="$tools_needed sysbench"
     command -v bc &>/dev/null || tools_needed="$tools_needed bc"
     command -v bzip2 &>/dev/null || tools_needed="$tools_needed bzip2"
+    command -v jq &>/dev/null || tools_needed="$tools_needed jq"
     
     if [[ -n "$tools_needed" ]]; then
         echo "安装必要工具: $tools_needed"
