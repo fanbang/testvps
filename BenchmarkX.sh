@@ -576,7 +576,7 @@ assess_overselling() {
     local swap_used=$(free -m | awk '/Swap:/ {if ($2 == 0) print "0"; else printf "%.1f", $3/$2*100}')
     
     # 内存带宽评估
-    local mem_bandwidth_gbs=$(( MEMORY_BANDWIDTH / 1000 ))
+    local mem_bandwidth_gbs=$(echo "scale=2; $MEMORY_BANDWIDTH / 1024" | bc)
     local mem_bandwidth_score=0
     
     if [[ $mem_bandwidth_gbs -gt 15 ]]; then
