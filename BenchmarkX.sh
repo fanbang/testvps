@@ -579,16 +579,19 @@ assess_overselling() {
     local mem_bandwidth_gbs=$(echo "scale=2; $MEMORY_BANDWIDTH / 1024" | bc)
     local mem_bandwidth_score=0
     
-    if [[ $mem_bandwidth_gbs -gt 15 ]]; then
+    if [ $(echo "$mem_bandwidth_gbs > 15" | bc -l) -eq 1 ]; then
         echo "内存带宽: 优秀 (${mem_bandwidth_gbs} GB/s) - 无超售迹象"
-        mem_bandwidth_score=2
-    elif [[ $mem_bandwidth_gbs -gt 8 ]]; then
+        mem_bandwidth_score=3
+    elif [ $(echo "$mem_bandwidth_gbs > 8" | bc -l) -eq 1 ]; then
         echo "内存带宽: 良好 (${mem_bandwidth_gbs} GB/s) - 轻度超售可能"
-        mem_bandwidth_score=1
+        mem_bandwidth_score=2 
+    elif [ $(echo "$mem_bandwidth_gbs > 3" | bc -l) -eq 1 ]; then
+        echo "内存带宽: 普通 (${mem_bandwidth_gbs} GB/s) - 重度超售可能"
+        mem_bandwidth_score=1 
     else
-        echo "内存带宽: 较差 (${mem_bandwidth_gbs} GB/s) - 可能超售"
+        echo "内存带宽: 较差 (${mem_bandwidth_gbs} GB/s) - 可能严重超售"
         mem_bandwidth_score=0
-    fi  
+    fi 
     
     memory_score=$(( mem_bandwidth_score + mem_usage_score + swap_score ))
     
@@ -623,7 +626,7 @@ assess_overselling() {
     total_score=$((cpu_score + memory_score + io_score))
     local oversell_level=""
     if [[ $total_score -ge 9 ]]; then
-        oversell_level="发现性能怪兽 牛头人"
+        oversell_level="非常好"
     elif [[ $total_score -ge 8 ]]; then
         oversell_level="无超售迹象"
     elif [[ $total_score -ge 6 ]]; then
@@ -634,16 +637,16 @@ assess_overselling() {
         oversell_level="发现远古巨瘦 您已严重超售"
     fi
     
-    echo -e "\n\033[1;35m超售综合评估: ${total_score}/9 - ${oversell_level}\033[0m"
+    echo -e "\n\033[1;35m超售综合评估: ${total_score}/10 - ${oversell_level}\033[0m"
 }
 testc() {
      
     cache_mb=$(echo "$l3_cache" | sed 's/.*\\([0-9]\\+\\) MB.*/\\1/')
     [ -n "$cache_mb" ] || cache_mb=0
     cache_bonus=$(($cache_mb * 20))
-    echo "L3 cache $cache_mb"  
+    echo "L3 cache $cache_mb"   
     #estimate_gb5_from_benchmarks 118 216 531
-    test_cpu_performance
+    #test_cpu_performance
     #test_cpu_multicore_efficiency
 }
 # ==================== 主函数 ====================
